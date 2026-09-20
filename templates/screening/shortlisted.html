@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Shortlisted Candidates{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+  <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">Shortlisted Candidates Pool</h1>
+  <p style="color: #94a3b8; font-size: 0.9rem; margin: 0;">Candidates approved and ready for interview scheduling</p>
+</div>
+
+<div class="content-card">
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Candidate</th>
+          <th>Job Role</th>
+          <th>Match Score</th>
+          <th>Experience</th>
+          <th>Shortlisted Date</th>
+          <th style="text-align: right;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in shortlisted %}
+          <tr>
+            <td>
+              <a href="{% url 'candidate_detail' c.job.id c.id %}" style="font-weight: 600; color: var(--text-main); text-decoration: none;">
+                {{ c.candidate_name|default:"Candidate" }}
+              </a>
+              <div style="font-size: 0.75rem; color: #64748b;">{{ c.candidate_email }}</div>
+            </td>
+            <td style="color: #94a3b8;">{{ c.job.title }}</td>
+            <td>
+              <span class="badge badge-success" style="font-weight: 700;">{{ c.total_score|floatformat:0 }}%</span>
+            </td>
+            <td style="color: #cbd5e1;">{{ c.candidate_experience_years|floatformat:1 }} yrs</td>
+            <td style="color: #64748b; font-size: 0.85rem;">{{ c.screened_at|date:"M d, Y" }}</td>
+            <td style="text-align: right;">
+              <div style="display: inline-flex; gap: 0.4rem;">
+                <a href="{% url 'candidate_detail' c.job.id c.id %}" class="btn btn-secondary btn-sm" style="text-decoration: none;">View</a>
+                <form method="POST" action="{% url 'shortlisted_candidates' %}" style="display: inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="move_to_review">
+                  <input type="hidden" name="candidate_id" value="{{ c.id }}">
+                  <button type="submit" class="btn btn-secondary btn-sm">Move to Review</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" style="text-align: center; color: #64748b; padding: 2.5rem;">
+              No candidates currently shortlisted.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

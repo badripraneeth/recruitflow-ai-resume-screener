@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Job Openings{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+  <div>
+    <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">Job Openings</h1>
+    <p style="color: #94a3b8; font-size: 0.9rem; margin: 0;">Manage your job listings and resume screening pipelines</p>
+  </div>
+  <a href="{% url 'job_create' %}" class="btn btn-primary" style="text-decoration: none;">+ Create Job</a>
+</div>
+
+<div class="content-card">
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Job Title</th>
+          <th>Location</th>
+          <th>Min Experience</th>
+          <th>Total Candidates</th>
+          <th>Status</th>
+          <th style="text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+          <tr>
+            <td>
+              <a href="{% url 'job_detail' job.id %}" style="font-weight: 600; color: var(--primary); text-decoration: none;">{{ job.title }}</a>
+              <div style="font-size: 0.75rem; color: #64748b;">Posted {{ job.created_at|date:"M d, Y" }}</div>
+            </td>
+            <td style="color: #cbd5e1;">Remote / Hybrid</td>
+            <td style="color: #cbd5e1;">{{ job.min_experience }} years</td>
+            <td style="color: #cbd5e1; font-weight: 600;">{{ job.resumes.count }}</td>
+            <td>
+              <span class="badge {% if job.status == 'active' %}badge-success{% else %}badge-secondary{% endif %}">
+                {{ job.get_status_display }}
+              </span>
+            </td>
+            <td style="text-align: right;">
+              <div style="display: inline-flex; gap: 0.4rem;">
+                <a href="{% url 'job_detail' job.id %}" class="btn btn-secondary btn-sm" style="text-decoration: none;">View</a>
+                <a href="{% url 'job_candidates' job.id %}" class="btn btn-secondary btn-sm" style="text-decoration: none;">Candidates</a>
+                <a href="{% url 'job_resume_upload' job.id %}" class="btn btn-primary btn-sm" style="text-decoration: none;">Upload</a>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" style="text-align: center; color: #64748b; padding: 2.5rem;">
+              No jobs created yet. Click "+ Create Job" to add one!
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

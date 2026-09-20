@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Resume Analysis - {{ resume.candidate_name|default:resume.filename }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem;">
+  <a href="{% url 'job_detail' resume.job.id %}" style="color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600;">← Back to Job</a>
+</div>
+
+<div class="content-card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h1 style="font-size: 1.6rem; font-weight: 700; color: var(--text-main);">{{ resume.candidate_name|default:resume.filename }}</h1>
+      <p style="color: #94a3b8; margin: 0.25rem 0 0.5rem 0;">Target Role: <strong>{{ resume.job.title }}</strong></p>
+      {% if screening %}
+        <span class="badge {% if screening.total_score >= 75 %}badge-success{% elif screening.total_score >= 50 %}badge-warning{% else %}badge-danger{% endif %}" style="font-size: 0.95rem; font-weight: 700;">
+          Score: {{ screening.total_score|floatformat:1 }}%
+        </span>
+      {% endif %}
+    </div>
+    <div>
+      {% if resume.file %}
+        <a href="{{ resume.file.url }}" target="_blank" class="btn btn-primary" style="text-decoration: none;">Download Original PDF ↗</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="content-card">
+  <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 1rem;">Extracted Resume Text</h2>
+  <div style="background: var(--bg-card-secondary); padding: 1.25rem; border-radius: var(--border-radius); border: 1px solid var(--border-color); color: #cbd5e1; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; line-height: 1.6; max-height: 500px; overflow-y: auto;">
+    {{ resume.extracted_text|default:"No extracted text available for this resume." }}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Recruiter Dashboard{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <h1 style="font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.35rem;">Recruiter Dashboard</h1>
+    <p style="color: #94a3b8; font-size: 0.9rem; margin: 0;">Overview of active hiring pipelines, candidate intake, and review statuses</p>
+  </div>
+  <div>
+    <a href="{% url 'job_create' %}" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      + Create Job
+    </a>
+  </div>
+</div>
+
+<div class="stats-grid" style="margin-bottom: 2rem;">
+  <div class="stat-card">
+    <div class="stat-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+      </svg>
+    </div>
+    <div class="stat-value">{{ active_jobs_count|default:"0" }}</div>
+    <div class="stat-label">Active Jobs</div>
+    <div class="stat-desc">Active hiring roles</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+      </svg>
+    </div>
+    <div class="stat-value">{{ total_resumes|default:total_resumes_count|default:"0" }}</div>
+    <div class="stat-label">Total Resumes</div>
+    <div class="stat-desc">Uploaded candidate files</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+    </div>
+    <div class="stat-value">{{ in_review_candidates|default:in_review_candidates_count|default:"0" }}</div>
+    <div class="stat-label">In Review</div>
+    <div class="stat-desc">Awaiting recruiter decision</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      </svg>
+    </div>
+    <div class="stat-value">{{ shortlisted_candidates|default:shortlisted_candidates_count|default:"0" }}</div>
+    <div class="stat-label">Shortlisted</div>
+    <div class="stat-desc">Approved candidates</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="15" y1="9" x2="9" y2="15"></line>
+        <line x1="9" y1="9" x2="15" y2="15"></line>
+      </svg>
+    </div>
+    <div class="stat-value">{{ rejected_candidates|default:rejected_candidates_count|default:"0" }}</div>
+    <div class="stat-label">Rejected</div>
+    <div class="stat-desc">Declined candidates</div>
+  </div>
+</div>
+
+<div class="content-card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div>
+      <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.2rem;">Recent Jobs</h2>
+      <p style="color: #94a3b8; font-size: 0.85rem; margin: 0;">Quick overview of candidate progress across recent positions</p>
+    </div>
+    <a href="{% url 'job_list' %}" style="color: var(--primary); font-size: 0.85rem; font-weight: 600; text-decoration: none;">View All Jobs →</a>
+  </div>
+
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Job Title</th>
+          <th>Candidates</th>
+          <th>Review</th>
+          <th>Shortlisted</th>
+          <th>Rejected</th>
+          <th>Status</th>
+          <th style="text-align: right;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in recent_jobs %}
+          <tr>
+            <td>
+              <a href="{% url 'job_detail' job.id %}" style="font-weight: 600; color: var(--primary); text-decoration: none;">{{ job.title }}</a>
+              <div style="font-size: 0.75rem; color: #64748b;">Created {{ job.created_at|date:"M d, Y" }}</div>
+            </td>
+            <td style="color: #cbd5e1; font-weight: 600;">{{ job.resumes.count }}</td>
+            <td style="color: #fbbf24; font-weight: 600;">{{ job.review_count }}</td>
+            <td style="color: #34d399; font-weight: 600;">{{ job.shortlisted_count }}</td>
+            <td style="color: #f87171; font-weight: 600;">{{ job.rejected_count }}</td>
+            <td>
+              <span class="badge {% if job.status == 'active' %}badge-success{% else %}badge-secondary{% endif %}">
+                {{ job.get_status_display }}
+              </span>
+            </td>
+            <td style="text-align: right;">
+              <div style="display: inline-flex; gap: 0.4rem;">
+                <a href="{% url 'job_detail' job.id %}" class="btn btn-secondary btn-sm" style="text-decoration: none;">View</a>
+                <a href="{% url 'job_candidates' job.id %}" class="btn btn-primary btn-sm" style="text-decoration: none;">Screening</a>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="7" style="text-align: center; color: #64748b; padding: 2.5rem;">
+              No job openings found. Click <strong>[+ Create Job]</strong> to get started!
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

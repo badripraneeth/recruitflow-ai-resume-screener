@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block page_title %}{{ job.title }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem;">
+  <a href="{% url 'job_list' %}" style="color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600;">← Back to Jobs</a>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h1 style="font-size: 1.6rem; font-weight: 700; color: var(--text-main);">{{ job.title }}</h1>
+      <span class="badge {% if job.status == 'active' %}badge-success{% else %}badge-secondary{% endif %}">{{ job.get_status_display }}</span>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+      <a href="{% url 'job_edit' job.id %}" class="btn btn-secondary" style="text-decoration: none;">Edit Job</a>
+      <a href="{% url 'job_resume_upload' job.id %}" class="btn btn-primary" style="text-decoration: none;">Upload Resumes</a>
+      <a href="{% url 'job_candidates' job.id %}" class="btn btn-secondary" style="text-decoration: none;">Screening Pipeline</a>
+    </div>
+  </div>
+</div>
+
+<div class="content-card" style="margin-bottom: 1.5rem;">
+  <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.75rem;">Job Description</h2>
+  <p style="color: #cbd5e1; white-space: pre-line; line-height: 1.6;">{{ job.description }}</p>
+</div>
+
+<div class="content-card">
+  <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 1rem;">Role Specifications</h2>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem;">
+    <div>
+      <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Required Skills</div>
+      <div style="font-weight: 600; color: #cbd5e1; margin-top: 0.25rem;">
+        {% for skill in job.required_skills %}
+          <span class="badge badge-info" style="margin-right: 0.25rem;">{{ skill }}</span>
+        {% empty %}
+          None specified
+        {% endfor %}
+      </div>
+    </div>
+    <div>
+      <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Preferred Skills</div>
+      <div style="font-weight: 600; color: #cbd5e1; margin-top: 0.25rem;">
+        {% for skill in job.preferred_skills %}
+          <span class="badge badge-secondary" style="margin-right: 0.25rem;">{{ skill }}</span>
+        {% empty %}
+          None
+        {% endfor %}
+      </div>
+    </div>
+    <div>
+      <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Experience Required</div>
+      <div style="font-weight: 600; color: #cbd5e1; margin-top: 0.25rem;">{{ job.experience_range_display }}</div>
+    </div>
+    <div>
+      <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Total Applications</div>
+      <div style="font-weight: 600; color: #cbd5e1; margin-top: 0.25rem;">{{ job.resumes.count }} resumes</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

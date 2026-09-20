@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Create Job Opening{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem;">
+  <a href="{% url 'job_list' %}" style="color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600;">← Back to Jobs</a>
+  <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-top: 0.5rem;">Create New Job Opening</h1>
+</div>
+
+<div class="content-card" style="max-width: 760px;">
+  <form method="POST">
+    {% csrf_token %}
+    <div class="form-group">
+      <label class="form-label">Job Title *</label>
+      {{ form.title }}
+      {{ form.title.errors }}
+    </div>
+    <div class="form-group">
+      <label class="form-label">Job Description *</label>
+      {{ form.description }}
+      {{ form.description.errors }}
+    </div>
+    <div class="form-group">
+      <label class="form-label">Required Skills (Comma separated) *</label>
+      {{ form.required_skills_input }}
+      {{ form.required_skills_input.errors }}
+    </div>
+    <div class="form-group">
+      <label class="form-label">Preferred Skills (Optional, comma separated)</label>
+      {{ form.preferred_skills_input }}
+      {{ form.preferred_skills_input.errors }}
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+      <div class="form-group">
+        <label class="form-label">Minimum Experience (Years)</label>
+        {{ form.min_experience }}
+        {{ form.min_experience.errors }}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Maximum Experience (Optional)</label>
+        {{ form.max_experience }}
+        {{ form.max_experience.errors }}
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        {{ form.status }}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Minimum Threshold Score (0-100)</label>
+        {{ form.minimum_score }}
+      </div>
+    </div>
+    <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+      <button type="submit" class="btn btn-primary">Create Job Opening</button>
+      <a href="{% url 'job_list' %}" class="btn btn-secondary" style="text-decoration: none;">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

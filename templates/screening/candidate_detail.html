@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Candidate Profile{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem;">
+  <a href="{% url 'job_candidates' candidate.job.id %}" style="color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600;">← Back to Candidates</a>
+</div>
+
+<div class="content-card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h1 style="font-size: 1.6rem; font-weight: 700; color: var(--text-main);">{{ candidate.candidate_name|default:"Candidate" }}</h1>
+      <p style="color: #94a3b8; margin: 0.25rem 0 0.75rem 0;">{{ candidate.candidate_email }} • Applied for: <strong>{{ candidate.job.title }}</strong></p>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <span class="badge {% if candidate.total_score >= 75 %}badge-success{% elif candidate.total_score >= 50 %}badge-warning{% else %}badge-danger{% endif %}" style="font-size: 0.95rem; font-weight: 700;">
+          Match Score: {{ candidate.total_score|floatformat:1 }}% ({{ candidate.total_score|floatformat:1 }} pts)
+        </span>
+        <span id="candidate-status-badge" class="badge {% if candidate.status == 'shortlisted' %}badge-success{% elif candidate.status == 'rejected' %}badge-danger{% else %}badge-warning{% endif %}" style="text-transform: capitalize;">
+          {{ candidate.get_status_display }}
+        </span>
+      </div>
+    </div>
+
+    <div class="decision-button-group" style="display: flex; gap: 0.5rem;">
+      <button type="button" class="btn btn-primary btn-decision" data-job-id="{{ candidate.job.id }}" data-candidate-id="{{ candidate.id }}" data-status="shortlisted" {% if candidate.status == 'shortlisted' %}disabled{% endif %}>Shortlist</button>
+      <button type="button" class="btn btn-secondary btn-decision" data-job-id="{{ candidate.job.id }}" data-candidate-id="{{ candidate.id }}" data-status="review" {% if candidate.status == 'review' %}disabled{% endif %}>Keep in Review</button>
+      <button type="button" class="btn btn-danger btn-decision" data-job-id="{{ candidate.job.id }}" data-candidate-id="{{ candidate.id }}" data-status="rejected" {% if candidate.status == 'rejected' %}disabled{% endif %}>Reject</button>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+  
+  <div class="content-card">
+    <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 1rem;">AI Screening Analysis</h2>
+    {% if candidate.candidate_summary %}
+    <div style="margin-bottom: 1.25rem; padding: 0.85rem 1rem; background: rgba(56, 189, 248, 0.08); border-left: 3px solid var(--primary); border-radius: 4px;">
+      <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--primary); margin-bottom: 0.35rem;">AI Executive Summary</div>
+      <p style="margin: 0; font-size: 0.9rem; color: #cbd5e1; line-height: 1.5;">{{ candidate.candidate_summary }}</p>
+    </div>
+    {% endif %}
+
+    <div style="margin-bottom: 1rem;">
+      <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Required Skills (40%)</div>
+      <div style="font-weight: 600; color: #cbd5e1; margin-top: 0.2rem;">{{ candidate.required_skills_score|floatformat:1 }} / 40.0 pts</div>
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+      <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Preferred Skills (15%)</div>
+      <div style="font-weight: 600; color: #cbd5e1; margin-top: 0.2rem;">{{ candidate.preferred_skills_score|floatformat:1 }} / 15.0 pts</div>
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+      <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Experience (20%)</div>
+      <div style="font-weight: 600; color: #cbd5e1; margin-top: 0.2rem;">{{ candidate.candidate_experience_years|floatformat:1 }} yrs ({{ candidate.experience_score|floatformat:1 }} / 20.0 pts)</div>
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+      <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Education (10%)</div>
+      <div style="font-weight: 600; color: #cbd5e1; margin-top: 0.2rem;">{{ candidate.education_score|floatformat:1 }} / 10.0 pts</div>
+      {% if candidate.candidate_education %}
+        <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.25rem;">{{ candidate.candidate_education }}</div>
+      {% endif %}
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+      <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Projects (15%)</div>
+      <div style="font-weight: 600; color: #cbd5e1; margin-top: 0.2rem;">{{ candidate.projects_score|floatformat:1 }} / 15.0 pts</div>
+      {% if candidate.candidate_projects_summary %}
+        <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.25rem; line-height: 1.4;">{{ candidate.candidate_projects_summary }}</div>
+      {% endif %}
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+      <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.4rem;">Matched Skills</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+        {% for skill in candidate.matched_required_skills %}
+          <span class="badge badge-success">{{ skill }}</span>
+        {% endfor %}
+        {% for skill in candidate.matched_preferred_skills %}
+          <span class="badge badge-success" style="background: rgba(56, 189, 248, 0.2); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.4);">{{ skill }} (Preferred)</span>
+        {% endfor %}
+        {% if not candidate.matched_required_skills and not candidate.matched_preferred_skills %}
+          <span style="color: #64748b; font-size: 0.85rem;">None identified</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.4rem;">Missing Skills</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+        {% for skill in candidate.missing_required_skills %}
+          <span class="badge badge-danger">{{ skill }}</span>
+        {% endfor %}
+        {% for skill in candidate.missing_preferred_skills %}
+          <span class="badge badge-danger" style="opacity: 0.75;">{{ skill }} (Preferred)</span>
+        {% endfor %}
+        {% if not candidate.missing_required_skills and not candidate.missing_preferred_skills %}
+          <span style="color: #64748b; font-size: 0.85rem;">None missing</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="content-card">
+    <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 1rem;">Recruiter Notes</h2>
+    <form id="recruiter-notes-form" data-job-id="{{ candidate.job.id }}" data-candidate-id="{{ candidate.id }}">
+      {% csrf_token %}
+      <textarea id="recruiter-notes-input" name="recruiter_notes" class="form-textarea" rows="4" placeholder="Add interview feedback, observations, or screening notes...">{{ candidate.recruiter_notes }}</textarea>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+        <button type="submit" id="btn-save-notes" class="btn btn-primary btn-sm">Save Notes</button>
+        {% if candidate.resume.file %}
+          <a href="{{ candidate.resume.file.url }}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none;">Download Resume ↗</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+  {% load static %}
+  <script src="{% static 'js/screening.js' %}"></script>
+{% endblock %}
