@@ -90,14 +90,21 @@ db_engine = os.getenv('DB_ENGINE', '').strip().lower()
 db_name = os.getenv('DB_NAME', '').strip()
 
 if ('postgresql' in db_engine or 'postgres' in db_engine) and db_name:
+    db_host = os.getenv('DB_HOST', 'localhost')
+    db_options = {}
+    sslmode = os.getenv('DB_SSLMODE', 'require' if 'neon.tech' in db_host else '')
+    if sslmode:
+        db_options['sslmode'] = sslmode
+
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': db_name,
             'USER': os.getenv('DB_USER', 'postgres'),
             'PASSWORD': os.getenv('DB_PASSWORD', ''),
-            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'HOST': db_host,
             'PORT': os.getenv('DB_PORT', '5432'),
+            'OPTIONS': db_options,
         }
     }
 else:
