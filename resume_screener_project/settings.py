@@ -15,7 +15,12 @@ load_dotenv(BASE_DIR / '.env')
 # Security settings
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-ai-recruiter-screening-key-dev-mode')
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
-ALLOWED_HOSTS = ['*'] if DEBUG else [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',') if host.strip()]
+ALLOWED_HOSTS = ['*'] if DEBUG else [
+    host.strip() for host in os.getenv(
+        'ALLOWED_HOSTS',
+        'localhost,127.0.0.1,testserver,.onrender.com,.railway.app'
+    ).split(',') if host.strip()
+]
 
 
 # Application definition
