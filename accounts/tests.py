@@ -134,3 +134,35 @@ class AuthenticationViewTests(TestCase):
         self.client.login(email='recruiter@example.com', password='Password123!')
         response = self.client.get(reverse('accounts:logout'))
         self.assertRedirects(response, reverse('accounts:login'))
+
+
+class SessionSecurityTests(TestCase):
+    """Verifies session expiration, rolling timeouts, and security settings."""
+
+    def test_session_settings_configured(self):
+        from django.conf import settings
+        # Default 1 hour (3600 seconds)
+        self.assertEqual(settings.SESSION_COOKIE_AGE, 3600)
+        # Rolling session: resets timer on activity
+        self.assertTrue(settings.SESSION_SAVE_EVERY_REQUEST)
+        # Expires on browser close
+        self.assertTrue(settings.SESSION_EXPIRE_AT_BROWSER_CLOSE)
+        # Protected against XSS
+        self.assertTrue(settings.SESSION_COOKIE_HTTPONLY)
+
+    def test_login_creates_secure_session_cookie(self):
+        User.objects.create_user(
+            email='session_user@test.com',
+            password='Password123!'
+        )
+        client = Client()
+        response = client.post(reverse('accounts:login'), {
+            'email': 'session_user@test.com',
+            'password': 'Password123!'
+        })
+        self.assertEqual(response.status_code, 302)
+        from django.conf import settings
+        session_cookie = client.cookies.get(settings.SESSION_COOKIE_NAME)
+        self.assertIsNotNone(session_cookie)
+        self.assertTrue(session_cookie['httponly'])
+

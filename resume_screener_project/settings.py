@@ -44,6 +44,23 @@ LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
+# Session Expiry & Cookie Security Settings
+# Session expires after 1 hour (3600 seconds) of inactivity by default
+SESSION_COOKIE_AGE = int(os.getenv('SESSION_COOKIE_AGE', 3600))
+# Rolling session: resets timer on every request so active users aren't interrupted
+SESSION_SAVE_EVERY_REQUEST = True
+# Expire session when user closes their browser window/tab
+SESSION_EXPIRE_AT_BROWSER_CLOSE = os.getenv('SESSION_EXPIRE_AT_BROWSER_CLOSE', 'True').lower() in ('true', '1', 'yes')
+# Security flags: prevent XSS attacks from reading session cookies
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in os.getenv(
         'CSRF_TRUSTED_ORIGINS',
