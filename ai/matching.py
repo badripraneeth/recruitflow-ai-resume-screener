@@ -16,6 +16,36 @@ class AnalysisValidationError(ValueError):
     pass
 
 
+def clean_candidate_name(name):
+    """
+    Cleans candidate name by stripping phone numbers, email addresses,
+    pipes, URLs, and resume keywords, returning only clean name words.
+    """
+    if not name or not isinstance(name, str):
+        return ""
+    import re
+    # Remove email addresses
+    name = re.sub(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}', '', name)
+    # Remove URLs / handles / domains
+    name = re.sub(r'https?://\S+|www\.\S+|linkedin\.com\S*|github\.com\S*', '', name, flags=re.I)
+    # Remove phone numbers (e.g. +91-8106009472 or 8106009472)
+    name = re.sub(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', '', name)
+    name = re.sub(r'\+?\d[\d\s\-\(\)]{8,}\d', '', name)
+    # Remove pipes, bullets, slashes, punctuation
+    name = re.sub(r'[|•\-_/:,;()\[\]{}]', ' ', name)
+    # Remove common non-name words
+    for word in ['resume', 'curriculum', 'vitae', 'cv', 'profile', 'summary', 'contact', 'email', 'phone', 'address', 'page', 'github', 'linkedin']:
+        name = re.sub(r'\b' + word + r'\b', '', name, flags=re.I)
+    # Collapse whitespace
+    name = re.sub(r'\s+', ' ', name).strip()
+    words = name.split()
+    if 1 <= len(words) <= 5:
+        return " ".join(words[:4])
+    elif words:
+        return " ".join(words[:3])
+    return ""
+
+
 def validate_analysis_schema(data):
     """
     Validates and normalizes the parsed JSON returned by the LLM.
@@ -29,8 +59,9 @@ def validate_analysis_schema(data):
     for forbidden_key in ('score', 'total_score', 'rating', 'screening_score', 'match_score'):
         data.pop(forbidden_key, None)
 
-    # 1. Candidate identity
-    candidate_name = str(data.get('candidate_name') or "").strip()
+    # 1. Candidate identity (clean of phone, email, pipes)
+    raw_name = str(data.get('candidate_name') or "").strip()
+    candidate_name = clean_candidate_name(raw_name) or raw_name[:50]
     candidate_email = str(data.get('candidate_email') or "").strip()
 
     # 2. Skills list

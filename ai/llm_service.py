@@ -72,7 +72,7 @@ class LLMService:
     """
     def __init__(self, api_key=None, model_name=None):
         self.api_key = api_key or get_llm_api_key()
-        self.model_name = model_name or os.getenv('LLM_MODEL', 'gemini-3.6-flash')
+        self.model_name = model_name or os.getenv('LLM_MODEL', 'gemini-2.0-flash')
         self.mock_mode = os.getenv('MOCK_LLM', 'False').lower() in ('true', '1', 'yes')
 
     def generate_json(self, system_prompt, user_prompt, timeout=60):
@@ -112,7 +112,7 @@ class LLMService:
         }
 
         candidate_models = [self.model_name]
-        for fallback in ('gemini-3.6-flash', 'gemini-flash-latest', 'gemini-2.5-flash'):
+        for fallback in ('gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-1.5-pro'):
             if fallback not in candidate_models:
                 candidate_models.append(fallback)
 

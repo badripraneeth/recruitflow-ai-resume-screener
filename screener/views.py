@@ -349,15 +349,23 @@ def job_resume_upload_view(request, job_id):
                 except Exception as e:
                     import logging
                     logging.getLogger(__name__).exception("Failed to screen resume %s: %s", res.id, e)
-                    ScreeningResult.objects.get_or_create(
+                    from ai.matching import extract_fallback_analysis_from_text
+                    analysis = extract_fallback_analysis_from_text(res.extracted_text or "", job)
+                    sr, _ = ScreeningResult.objects.get_or_create(
                         job=job,
                         resume=res,
                         defaults={
-                            'total_score': 50.0,
+                            'matched_required_skills': analysis.get('matched_required_skills', []),
+                            'missing_required_skills': analysis.get('missing_required_skills', job.required_skills or []),
+                            'matched_preferred_skills': analysis.get('matched_preferred_skills', []),
+                            'missing_preferred_skills': analysis.get('missing_preferred_skills', job.preferred_skills or []),
+                            'candidate_experience_years': analysis.get('experience_years', 0.0),
+                            'candidate_summary': "Resume text could not be fully analyzed. Manual review recommended.",
                             'status': ScreeningResult.STATUS_REVIEW,
-                            'candidate_experience_years': job.min_experience or 1.0,
                         }
                     )
+                    apply_scoring_to_screening_result(sr, analysis, job)
+                    success_count += 1
 
             messages.success(request, f'Successfully uploaded and screened {success_count} candidate resume(s)!')
             return redirect('job_candidates', job_id=job.id)

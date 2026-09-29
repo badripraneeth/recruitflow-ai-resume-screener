@@ -33,7 +33,7 @@ Experience Required: {min_experience} to {max_experience} years
 === REQUIRED OUTPUT JSON FORMAT ===
 Return a JSON object conforming exactly to this structure:
 {{
-  "candidate_name": "Full name of candidate, or empty string if not found",
+  "candidate_name": "Full name of candidate ONLY (e.g. 'Badri Praneeth'). Strictly exclude phone numbers, email addresses, pipe symbols (|), URLs, or job titles from candidate_name.",
   "candidate_email": "Email of candidate, or empty string if not found",
   "skills": ["Array", "of", "all", "extracted", "skills"],
   "experience_years": 0.0,
@@ -55,4 +55,6 @@ Return a JSON object conforming exactly to this structure:
   "missing_preferred_skills": ["List of preferred job skills absent from resume"],
   "ai_summary": "Concise 2-3 sentence professional candidate summary focusing on strengths and gaps"
 }}
+NOTE ON EXPERIENCE: Calculate total work or internship experience in years as a float. If experience is given in weeks, convert weeks / 52 (e.g. 2 weeks = 0.04). If in months, convert months / 12 (e.g. 6 months = 0.5). If candidate is a fresher, college student, or has 0 experience, return 0.0.
+
 """

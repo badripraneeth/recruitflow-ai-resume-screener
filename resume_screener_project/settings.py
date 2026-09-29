@@ -100,16 +100,18 @@ TEMPLATES = [
 WSGI_APPLICATION = 'resume_screener_project.wsgi.application'
 
 
-# Database Configuration
-# Primary: PostgreSQL via environment variables (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
+# PostgreSQL (supports both standard PG* env vars from Neon and DB_* custom vars)
 # Fallback: SQLite3 for local development if PostgreSQL is not configured or offline.
-db_engine = os.getenv('DB_ENGINE', '').strip().lower()
-db_name = os.getenv('DB_NAME', '').strip()
+db_engine = os.getenv('DB_ENGINE', 'django.db.backends.postgresql' if (os.getenv('PGDATABASE') or os.getenv('PGHOST')) else '').strip().lower()
+db_name = (os.getenv('DB_NAME') or os.getenv('PGDATABASE') or '').strip()
+db_user = (os.getenv('DB_USER') or os.getenv('PGUSER') or 'postgres').strip()
+db_password = (os.getenv('DB_PASSWORD') or os.getenv('PGPASSWORD') or '').strip()
+db_host = (os.getenv('DB_HOST') or os.getenv('PGHOST') or 'localhost').strip()
+db_port = (os.getenv('DB_PORT') or os.getenv('PGPORT') or '5432').strip()
 
-if ('postgresql' in db_engine or 'postgres' in db_engine) and db_name:
-    db_host = os.getenv('DB_HOST', 'localhost')
+if ('postgresql' in db_engine or 'postgres' in db_engine or os.getenv('PGHOST')) and db_name:
     db_options = {}
-    sslmode = os.getenv('DB_SSLMODE', 'require' if 'neon.tech' in db_host else '')
+    sslmode = os.getenv('DB_SSLMODE') or os.getenv('PGSSLMODE') or ('require' if 'neon.tech' in db_host else '')
     if sslmode:
         db_options['sslmode'] = sslmode
 
@@ -117,10 +119,10 @@ if ('postgresql' in db_engine or 'postgres' in db_engine) and db_name:
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': db_name,
-            'USER': os.getenv('DB_USER', 'postgres'),
-            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'USER': db_user,
+            'PASSWORD': db_password,
             'HOST': db_host,
-            'PORT': os.getenv('DB_PORT', '5432'),
+            'PORT': db_port,
             'OPTIONS': db_options,
         }
     }

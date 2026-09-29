@@ -110,8 +110,8 @@
       <textarea id="recruiter-notes-input" name="recruiter_notes" class="form-textarea" rows="4" placeholder="Add interview feedback, observations, or screening notes...">{{ candidate.recruiter_notes }}</textarea>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
         <button type="submit" id="btn-save-notes" class="btn btn-primary btn-sm">Save Notes</button>
-        {% if candidate.resume.file %}
-          <a href="{{ candidate.resume.file.url }}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none;">Download Resume ↗</a>
+        {% if candidate.resume and candidate.resume.file %}
+          <a href="{% url 'resumes:resume_download' candidate.resume.pk %}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none;">Download Resume ↗</a>
         {% endif %}
       </div>
     </form>

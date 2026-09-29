@@ -20,7 +20,7 @@
     </div>
     <div>
       {% if resume.file %}
-        <a href="{{ resume.file.url }}" target="_blank" class="btn btn-primary" style="text-decoration: none;">Download Original PDF ↗</a>
+        <a href="{% url 'resumes:resume_download' resume.pk %}" target="_blank" class="btn btn-primary" style="text-decoration: none;">Download Original PDF ↗</a>
       {% endif %}
     </div>
   </div>

@@ -42,6 +42,7 @@ urlpatterns = [
     path('resumes/upload/', resumes_views.resume_upload_view, name='resume_upload'),
     path('resumes/<int:pk>/analyze/', resumes_views.resume_analyze_view, name='resume_analyze'),
     path('resumes/<int:pk>/analysis/', resumes_views.resume_analysis_detail_view, name='resume_analysis_detail'),
+    path('resumes/<int:pk>/download/', resumes_views.resume_download_view, name='resume_download'),
     path('resumes/', include('resumes.urls', namespace='resumes')),
 
     # Decision & Bulk APIs
@@ -52,6 +53,12 @@ urlpatterns = [
     path('jobs/<int:job_id>/candidates/bulk-shortlist-reject-unselected/', screener_views.bulk_shortlist_reject_unselected, name='bulk_shortlist_reject_unselected'),
 ]
 
+# Always serve media files from MEDIA_ROOT (works in development AND production on Render)
+from django.urls import re_path
+from django.views.static import serve
+urlpatterns += [
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+]
+
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
