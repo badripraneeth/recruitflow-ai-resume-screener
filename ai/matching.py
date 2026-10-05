@@ -25,25 +25,76 @@ def clean_candidate_name(name):
         return ""
     import re
     # Remove email addresses
-    name = re.sub(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}', '', name)
+    name = re.sub(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}', ' ', name)
     # Remove URLs / handles / domains
-    name = re.sub(r'https?://\S+|www\.\S+|linkedin\.com\S*|github\.com\S*', '', name, flags=re.I)
+    name = re.sub(r'https?://\S+|www\.\S+|linkedin\.com\S*|github\.com\S*', ' ', name, flags=re.I)
     # Remove phone numbers (e.g. +91-8106009472 or 8106009472)
-    name = re.sub(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', '', name)
-    name = re.sub(r'\+?\d[\d\s\-\(\)]{8,}\d', '', name)
+    name = re.sub(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', ' ', name)
+    name = re.sub(r'\+?\d[\d\s\-\(\)]{8,}\d', ' ', name)
     # Remove pipes, bullets, slashes, punctuation
     name = re.sub(r'[|•\-_/:,;()\[\]{}]', ' ', name)
-    # Remove common non-name words
+    # Remove common non-name words and noise tokens
     for word in ['resume', 'curriculum', 'vitae', 'cv', 'profile', 'summary', 'contact', 'email', 'phone', 'address', 'page', 'github', 'linkedin']:
-        name = re.sub(r'\b' + word + r'\b', '', name, flags=re.I)
-    # Collapse whitespace
+        name = re.sub(r'\b' + word + r'\b', ' ', name, flags=re.I)
+    name = re.sub(r'\d+', ' ', name)
     name = re.sub(r'\s+', ' ', name).strip()
-    words = name.split()
+    words = [word for word in name.split() if len(word) > 1]
     if 1 <= len(words) <= 5:
         return " ".join(words[:4])
     elif words:
         return " ".join(words[:3])
     return ""
+
+
+def _find_candidate_name_from_lines(lines):
+    import re
+    for line in lines[:12]:
+        candidate = clean_candidate_name(line)
+        if not candidate:
+            continue
+        if len(candidate.split()) > 4:
+            continue
+        if any(keyword in candidate.lower() for keyword in ['resume', 'cv', 'summary', 'profile', 'curriculum', 'page', 'contact']):
+            continue
+        return candidate
+    return ""
+
+
+def _extract_experience_years_from_text(resume_text):
+    import re
+    from datetime import datetime
+
+    cleaned_text = resume_text.replace('–', '-').replace('—', '-')
+    date_pattern = r'(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\s*(?:-|to)\s*(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})'
+
+    for line in cleaned_text.splitlines():
+        line_lower = line.lower()
+        if 'education' in line_lower or 'b.tech' in line_lower or 'intermediate' in line_lower or 'ssc' in line_lower:
+            continue
+
+        date_match = re.search(date_pattern, line, flags=re.I)
+        if date_match:
+            try:
+                start = datetime.strptime(date_match.group(1), '%d %b %Y')
+                end = datetime.strptime(date_match.group(2), '%d %b %Y')
+                delta_days = (end - start).days
+                if delta_days > 0:
+                    return round(max(delta_days / 365.0, 0.0), 2)
+            except ValueError:
+                pass
+
+    for pattern in [
+        r'(?i)(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?)\s*(?:of)?\s*experience',
+        r'(?i)(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:months?|mos?)\s*(?:of)?\s*experience',
+    ]:
+        match = re.search(pattern, cleaned_text)
+        if match:
+            value = float(match.group(1))
+            if 'month' in match.group(0).lower():
+                return round(value / 12.0, 2)
+            return round(value, 2)
+
+    return 0.0
 
 
 def validate_analysis_schema(data):
@@ -61,7 +112,7 @@ def validate_analysis_schema(data):
 
     # 1. Candidate identity (clean of phone, email, pipes)
     raw_name = str(data.get('candidate_name') or "").strip()
-    candidate_name = clean_candidate_name(raw_name) or raw_name[:50]
+    candidate_name = clean_candidate_name(raw_name)
     candidate_email = str(data.get('candidate_email') or "").strip()
 
     # 2. Skills list
@@ -144,14 +195,7 @@ def extract_fallback_analysis_from_text(resume_text, target_job):
     lines = [line.strip() for line in resume_text.splitlines() if line.strip()]
 
     # Candidate name: first clean non-header line
-    candidate_name = ""
-    for line in lines[:5]:
-        clean_l = re.sub(r'[^\w\s]', '', line).strip()
-        if clean_l and len(clean_l.split()) in (1, 2, 3, 4) and not any(k in clean_l.lower() for k in ['resume', 'cv', 'summary', 'profile', 'curriculum', 'page']):
-            candidate_name = clean_l
-            break
-    if not candidate_name and lines:
-        candidate_name = lines[0][:50]
+    candidate_name = _find_candidate_name_from_lines(lines)
 
     # Email
     email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', resume_text)
@@ -203,13 +247,7 @@ def extract_fallback_analysis_from_text(resume_text, target_job):
                     break
 
     # Experience
-    exp_years = 0.0
-    exp_matches = re.findall(r'(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?)(?:\s+of)?\s+experience', resume_text, re.I)
-    if exp_matches:
-        try:
-            exp_years = float(exp_matches[0])
-        except ValueError:
-            pass
+    exp_years = _extract_experience_years_from_text(resume_text)
 
     all_matched = matched_required + matched_preferred
     ai_summary = f"{candidate_name or 'Candidate'} demonstrates strong development capabilities with {len(matched_required)}/{len(target_job.required_skills or [])} required skills verified ({', '.join(matched_required) if matched_required else 'review recommended'})."
@@ -273,20 +311,28 @@ def analyze_resume_against_job(resume, job=None, llm_service=None):
         logging.getLogger(__name__).warning("LLM API generation failed (%s). Using rule-based fallback extractor.", llm_err)
         analysis = extract_fallback_analysis_from_text(clean_text, target_job)
 
-    # Update Resume with extracted candidate metadata
-    update_fields = []
-    extracted_name = (analysis.get('candidate_name') or '').strip()
-    if extracted_name and extracted_name.lower() not in ('unknown', 'none', 'n/a'):
-        resume.candidate_name = extracted_name
-        update_fields.append('candidate_name')
-    extracted_email = (analysis.get('candidate_email') or '').strip()
-    if extracted_email and extracted_email.lower() not in ('unknown', 'none', 'n/a'):
-        resume.candidate_email = extracted_email
-        update_fields.append('candidate_email')
+    fallback_analysis = extract_fallback_analysis_from_text(clean_text, target_job)
+    if not analysis['candidate_name']:
+        analysis['candidate_name'] = fallback_analysis['candidate_name']
+    if not analysis['candidate_email']:
+        analysis['candidate_email'] = fallback_analysis['candidate_email']
+    if analysis['experience_years'] == 0.0 and fallback_analysis['experience_years'] > 0.0:
+        analysis['experience_years'] = fallback_analysis['experience_years']
+    if not analysis['matched_required_skills'] and fallback_analysis['matched_required_skills']:
+        analysis['matched_required_skills'] = fallback_analysis['matched_required_skills']
+        analysis['missing_required_skills'] = fallback_analysis['missing_required_skills']
+    if not analysis['matched_preferred_skills'] and fallback_analysis['matched_preferred_skills']:
+        analysis['matched_preferred_skills'] = fallback_analysis['matched_preferred_skills']
+        analysis['missing_preferred_skills'] = fallback_analysis['missing_preferred_skills']
+    if not analysis['skills']:
+        analysis['skills'] = fallback_analysis['skills']
 
-    if update_fields:
-        update_fields.append('updated_at')
-        resume.save(update_fields=update_fields)
+    # Update Resume with extracted candidate metadata
+    extracted_name = (analysis.get('candidate_name') or '').strip()
+    extracted_email = (analysis.get('candidate_email') or '').strip()
+    resume.candidate_name = extracted_name if extracted_name.lower() not in ('unknown', 'none', 'n/a') else ''
+    resume.candidate_email = extracted_email if extracted_email.lower() not in ('unknown', 'none', 'n/a') else ''
+    resume.save(update_fields=['candidate_name', 'candidate_email', 'updated_at'])
 
     # Education summary string for display
     edu_str = ", ".join([f"{e['degree']} in {e['field']}".strip() for e in analysis['education'] if e['degree']])

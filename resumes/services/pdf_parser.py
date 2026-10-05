@@ -1,10 +1,13 @@
 import os
+import zipfile
+import xml.etree.ElementTree as ET
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError, PdfStreamError
 
 
 # Maximum allowed PDF file size: 10 MB
 MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024
+MAX_DOCX_UNCOMPRESSED_SIZE_BYTES = 50 * 1024 * 1024
 
 
 class PDFValidationError(ValueError):
@@ -127,3 +130,62 @@ def extract_text_from_pdf(file):
 
     extracted_text = "\n\n".join(text_fragments).strip()
     return extracted_text
+
+
+def extract_text_from_docx(file):
+    """Extracts paragraph text from a DOCX document without accepting other formats."""
+    if isinstance(file, (str, os.PathLike)):
+        filename = os.path.basename(str(file))
+        file_size = os.path.getsize(file) if os.path.exists(file) else None
+    else:
+        filename = getattr(file, 'name', '')
+        file_size = getattr(file, 'size', None)
+
+    if not filename.lower().endswith('.docx'):
+        raise PDFValidationError(f"Invalid file extension for '{filename}'. Only DOCX files are supported.")
+    if file_size is not None and file_size > MAX_PDF_SIZE_BYTES:
+        raise PDFValidationError("DOCX files must not exceed 10MB.")
+
+    source = None
+    close_source = isinstance(file, (str, os.PathLike))
+    try:
+        source = open(file, 'rb') if close_source else file
+        if hasattr(source, 'seek'):
+            source.seek(0)
+        with zipfile.ZipFile(source) as archive:
+            document = archive.getinfo('word/document.xml')
+            if document.file_size > MAX_DOCX_UNCOMPRESSED_SIZE_BYTES:
+                raise PDFValidationError("DOCX document content exceeds the maximum allowed size.")
+            root = ET.fromstring(archive.read(document))
+    except PDFValidationError:
+        raise
+    except (OSError, zipfile.BadZipFile, KeyError, ET.ParseError) as err:
+        raise PDFParsingError(f"Corrupted or unreadable DOCX: {err}") from err
+    finally:
+        if close_source and source is not None:
+            source.close()
+        elif source is not None and hasattr(source, 'seek'):
+            source.seek(0)
+
+    namespace = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+    paragraphs = []
+    for paragraph in root.iter(f'{namespace}p'):
+        text = ''.join(
+            node.text or ''
+            for node in paragraph.iter()
+            if node.tag in (f'{namespace}t', f'{namespace}tab')
+        ).strip()
+        if text:
+            paragraphs.append(text)
+    return '\n'.join(paragraphs)
+
+
+def extract_text_from_resume(file):
+    """Extracts text from a supported PDF or DOCX resume."""
+    filename = os.path.basename(str(file)) if isinstance(file, (str, os.PathLike)) else getattr(file, 'name', '')
+    extension = os.path.splitext(filename)[1].lower()
+    if extension == '.pdf':
+        return extract_text_from_pdf(file)
+    if extension == '.docx':
+        return extract_text_from_docx(file)
+    raise PDFValidationError(f"Unsupported resume format for '{filename}'. Upload a PDF or DOCX file.")

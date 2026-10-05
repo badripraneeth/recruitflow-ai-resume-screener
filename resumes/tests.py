@@ -1,13 +1,16 @@
 import io
+from zipfile import ZipFile
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
+from unittest.mock import patch
 from pypdf import PdfWriter
 from screener.models import Job
 from .models import Resume
 from .services.pdf_parser import (
     extract_text_from_pdf,
+    extract_text_from_resume,
     validate_pdf_file,
     PDFValidationError,
     PDFParsingError
@@ -21,12 +24,33 @@ def create_sample_pdf_bytes(text="Sample candidate resume content."):
     # Since pypdf's PdfWriter creates valid PDF structure with metadata/pages
     writer = PdfWriter()
     writer.add_blank_page(width=612, height=792)
+    writer.add_metadata({'/Title': text})
     stream = io.BytesIO()
     writer.write(stream)
     return stream.getvalue()
 
 
 class PDFParserServiceTests(TestCase):
+    def test_extracts_text_from_docx(self):
+        stream = io.BytesIO()
+        document_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:body><w:p><w:r><w:t>Alice Johnson</w:t></w:r></w:p>'
+            '<w:p><w:r><w:t>Python and Django</w:t></w:r></w:p></w:body></w:document>'
+        )
+        with ZipFile(stream, 'w') as archive:
+            archive.writestr('word/document.xml', document_xml)
+        upload = SimpleUploadedFile(
+            'resume.docx',
+            stream.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        )
+
+        text = extract_text_from_resume(upload)
+
+        self.assertEqual(text, 'Alice Johnson\nPython and Django')
+
     def test_rejects_non_pdf_extension(self):
         fake_file = SimpleUploadedFile("resume.docx", b"dummy content", content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         with self.assertRaises(PDFValidationError) as ctx:
@@ -92,12 +116,15 @@ class ResumeUploadTests(TestCase):
             min_experience=2.0
         )
 
-    def test_recruiter_can_upload_multiple_resumes_for_own_job(self):
+    @patch('resumes.views.apply_scoring_to_screening_result')
+    @patch('resumes.views.analyze_resume_against_job', return_value=(None, {}))
+    @patch('resumes.views.extract_text_from_resume', return_value='Alice Johnson Python Django developer with experience.')
+    def test_recruiter_can_upload_multiple_resumes_for_own_job(self, _extract_text, _analyze, _score):
         """Test uploading multiple valid PDFs for Recruiter A's job."""
         self.client.login(email='recruiter_a@test.com', password='Password123!')
         
-        pdf1 = SimpleUploadedFile("resume_alice.pdf", create_sample_pdf_bytes(), content_type="application/pdf")
-        pdf2 = SimpleUploadedFile("resume_bob.pdf", create_sample_pdf_bytes(), content_type="application/pdf")
+        pdf1 = SimpleUploadedFile("resume_alice.pdf", create_sample_pdf_bytes("Alice"), content_type="application/pdf")
+        pdf2 = SimpleUploadedFile("resume_bob.pdf", create_sample_pdf_bytes("Bob"), content_type="application/pdf")
 
         response = self.client.post(
             reverse('resume_upload'),
@@ -116,6 +143,46 @@ class ResumeUploadTests(TestCase):
         for res in resumes:
             self.assertEqual(res.recruiter, self.recruiter_a)
             self.assertIsNotNone(res.extracted_text)
+
+    @patch('resumes.views.apply_scoring_to_screening_result')
+    @patch('resumes.views.analyze_resume_against_job', return_value=(None, {}))
+    @patch('resumes.views.extract_text_from_resume', return_value='Alice Johnson alice@example.com Python Django experience.')
+    def test_reupload_by_email_replaces_resume_and_removes_duplicate_records(
+        self, _extract_text, _analyze, _score
+    ):
+        first = Resume.objects.create(
+            recruiter=self.recruiter_a,
+            job=self.job_a,
+            candidate_email='alice@example.com',
+            file=SimpleUploadedFile('alice_old.pdf', create_sample_pdf_bytes('old')),
+            extracted_text='Old extraction',
+        )
+        duplicate = Resume.objects.create(
+            recruiter=self.recruiter_a,
+            job=self.job_a,
+            candidate_email='alice@example.com',
+            file=SimpleUploadedFile('alice_duplicate.pdf', create_sample_pdf_bytes('duplicate')),
+            extracted_text='Duplicate extraction',
+        )
+        self.client.login(email='recruiter_a@test.com', password='Password123!')
+        replacement = SimpleUploadedFile(
+            'alice_latest.pdf',
+            create_sample_pdf_bytes('replacement'),
+            content_type='application/pdf',
+        )
+
+        response = self.client.post(
+            reverse('resume_upload'),
+            {'job_id': self.job_a.pk, 'resumes': [replacement]},
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse('job_detail', kwargs={'pk': self.job_a.pk}))
+        self.assertEqual(Resume.objects.filter(recruiter=self.recruiter_a, job=self.job_a).count(), 1)
+        kept = Resume.objects.get(recruiter=self.recruiter_a, job=self.job_a)
+        self.assertEqual(kept.pk, duplicate.pk)
+        self.assertEqual(kept.filename, 'alice_latest.pdf')
+        self.assertFalse(Resume.objects.filter(pk=first.pk).exists())
 
     def test_recruiter_cannot_upload_resumes_into_another_recruiters_job(self):
         """

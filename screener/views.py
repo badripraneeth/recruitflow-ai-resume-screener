@@ -1,4 +1,5 @@
 import json
+import re
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, Http404
@@ -10,9 +11,10 @@ from .forms import JobForm
 from .models import Job, ScreeningResult
 from resumes.models import Resume
 from resumes.forms import ResumeUploadForm
-from resumes.services.pdf_parser import extract_text_from_pdf
+from resumes.services.duplicates import find_existing_resume, remove_duplicate_resumes
+from resumes.services.pdf_parser import PDFParsingError, PDFValidationError, extract_text_from_resume
 from ai.matching import analyze_resume_against_job
-from screening.services.scoring import apply_scoring_to_screening_result
+from screener.services.scoring import apply_scoring_to_screening_result
 
 
 @login_required
@@ -319,27 +321,47 @@ def job_resume_upload_view(request, job_id):
             for f in files:
                 ext = f.name.split('.')[-1].lower()
                 if ext not in ('pdf', 'docx'):
+                    messages.error(request, f'"{f.name}" is not a supported resume format. Upload PDF or DOCX files.')
                     continue
 
-                res = Resume.objects.create(
-                    recruiter=request.user,
-                    job=job,
-                    file=f,
-                    candidate_name=f.name.rsplit('.', 1)[0]
-                )
-
-                # Extract text
-                text = ""
                 try:
-                    text = extract_text_from_pdf(res.file.path)
-                except Exception:
-                    try:
-                        text = extract_text_from_pdf(f)
-                    except Exception:
-                        text = ""
+                    text = extract_text_from_resume(f)
+                except (PDFValidationError, PDFParsingError) as error:
+                    messages.error(request, f'Could not read "{f.name}": {error}')
+                    continue
+                if not text.strip():
+                    messages.error(request, f'No readable text was found in "{f.name}". Upload a text-based PDF or DOCX.')
+                    continue
 
-                res.extracted_text = text or "Resume text extraction completed."
-                res.save(update_fields=['extracted_text'])
+                email_match = re.search(
+                    r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+                    text,
+                )
+                candidate_email = email_match.group(0) if email_match else ''
+                res = find_existing_resume(request.user, job, f, candidate_email)
+                if res is None:
+                    res = Resume.objects.create(
+                        recruiter=request.user,
+                        job=job,
+                        file=f,
+                        candidate_name=f.name.rsplit('.', 1)[0],
+                        extracted_text=text,
+                    )
+                else:
+                    res.file.delete(save=False)
+                    res.file = f
+                    res.candidate_name = ''
+                    res.candidate_email = ''
+                    res.extracted_text = text
+                    res.status = Resume.STATUS_REVIEW
+                    res.recruiter_notes = ''
+                    res.save(update_fields=[
+                        'file', 'candidate_name', 'candidate_email', 'extracted_text',
+                        'status', 'recruiter_notes', 'updated_at',
+                    ])
+                    ScreeningResult.objects.filter(job=job, resume=res).delete()
+
+                remove_duplicate_resumes(res, candidate_email)
 
                 # Run AI Matching & Deterministic Scoring
                 try:
@@ -349,23 +371,9 @@ def job_resume_upload_view(request, job_id):
                 except Exception as e:
                     import logging
                     logging.getLogger(__name__).exception("Failed to screen resume %s: %s", res.id, e)
-                    from ai.matching import extract_fallback_analysis_from_text
-                    analysis = extract_fallback_analysis_from_text(res.extracted_text or "", job)
-                    sr, _ = ScreeningResult.objects.get_or_create(
-                        job=job,
-                        resume=res,
-                        defaults={
-                            'matched_required_skills': analysis.get('matched_required_skills', []),
-                            'missing_required_skills': analysis.get('missing_required_skills', job.required_skills or []),
-                            'matched_preferred_skills': analysis.get('matched_preferred_skills', []),
-                            'missing_preferred_skills': analysis.get('missing_preferred_skills', job.preferred_skills or []),
-                            'candidate_experience_years': analysis.get('experience_years', 0.0),
-                            'candidate_summary': "Resume text could not be fully analyzed. Manual review recommended.",
-                            'status': ScreeningResult.STATUS_REVIEW,
-                        }
-                    )
-                    apply_scoring_to_screening_result(sr, analysis, job)
-                    success_count += 1
+                    messages.error(request, f'Could not analyze "{f.name}": {e}')
+                    continue
+                success_count += 1
 
             messages.success(request, f'Successfully uploaded and screened {success_count} candidate resume(s)!')
             return redirect('job_candidates', job_id=job.id)

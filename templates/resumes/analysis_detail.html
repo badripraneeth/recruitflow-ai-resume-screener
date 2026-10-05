@@ -19,8 +19,12 @@
       {% endif %}
     </div>
     <div>
+      <form method="post" action="{% url 'resume_analyze' resume.pk %}" style="display: inline-block; margin-right: 0.5rem;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">Re-analyze Resume</button>
+      </form>
       {% if resume.file %}
-        <a href="{% url 'resumes:resume_download' resume.pk %}" target="_blank" class="btn btn-primary" style="text-decoration: none;">Download Original PDF ↗</a>
+        <a href="{% url 'resumes:resume_download' resume.pk %}" target="_blank" class="btn btn-primary" style="text-decoration: none;">Download Original Resume ↗</a>
       {% endif %}
     </div>
   </div>
