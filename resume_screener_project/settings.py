@@ -3,6 +3,7 @@ Django settings for resume_screener_project project.
 """
 
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -40,9 +41,9 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-LOGIN_URL = '/login/'
+LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/login/'
+LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 # Session Expiry & Cookie Security Settings
 # Session expires after 1 hour (3600 seconds) of inactivity by default
@@ -109,7 +110,17 @@ db_password = (os.getenv('DB_PASSWORD') or os.getenv('PGPASSWORD') or '').strip(
 db_host = (os.getenv('DB_HOST') or os.getenv('PGHOST') or 'localhost').strip()
 db_port = (os.getenv('DB_PORT') or os.getenv('PGPORT') or '5432').strip()
 
-if ('postgresql' in db_engine or 'postgres' in db_engine or os.getenv('PGHOST')) and db_name:
+if 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
+    PASSWORD_HASHERS = [
+        'django.contrib.auth.hashers.MD5PasswordHasher',
+    ]
+elif ('postgresql' in db_engine or 'postgres' in db_engine or os.getenv('PGHOST')) and db_name:
     db_options = {}
     sslmode = os.getenv('DB_SSLMODE') or os.getenv('PGSSLMODE') or ('require' if 'neon.tech' in db_host else '')
     if sslmode:

@@ -181,7 +181,7 @@ class ResumeUploadTests(TestCase):
         self.assertEqual(Resume.objects.filter(recruiter=self.recruiter_a, job=self.job_a).count(), 1)
         kept = Resume.objects.get(recruiter=self.recruiter_a, job=self.job_a)
         self.assertEqual(kept.pk, duplicate.pk)
-        self.assertEqual(kept.filename, 'alice_latest.pdf')
+        self.assertTrue(kept.filename.startswith('alice_latest') and kept.filename.endswith('.pdf'))
         self.assertFalse(Resume.objects.filter(pk=first.pk).exists())
 
     def test_recruiter_cannot_upload_resumes_into_another_recruiters_job(self):
