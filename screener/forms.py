@@ -1,3 +1,4 @@
+import re
 from django import forms
 from django.core.exceptions import ValidationError
 from .models import Job
@@ -83,6 +84,7 @@ class JobForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Ensure optional fields are clearly marked as optional
+        self.fields['min_experience'].required = False
         self.fields['max_experience'].required = False
         self.fields['minimum_score'].required = False
         self.fields['shortlist_count'].required = False
@@ -94,16 +96,22 @@ class JobForm(forms.ModelForm):
             if self.instance.preferred_skills:
                 self.fields['preferred_skills_input'].initial = ', '.join(self.instance.preferred_skills)
 
+    def clean_min_experience(self):
+        val = self.cleaned_data.get('min_experience')
+        if val is None or val == '':
+            return 0.0
+        return val
+
     def clean_required_skills_input(self):
         raw = self.cleaned_data.get('required_skills_input', '')
-        skills = [s.strip() for s in raw.split(',') if s.strip()]
+        skills = [s.strip() for s in re.split(r'[,;\n]+', raw) if s.strip()]
         if not skills:
             raise ValidationError('Please provide at least one required skill.')
         return skills
 
     def clean_preferred_skills_input(self):
         raw = self.cleaned_data.get('preferred_skills_input', '')
-        skills = [s.strip() for s in raw.split(',') if s.strip()]
+        skills = [s.strip() for s in re.split(r'[,;\n]+', raw) if s.strip()]
         return skills
 
     def clean(self):

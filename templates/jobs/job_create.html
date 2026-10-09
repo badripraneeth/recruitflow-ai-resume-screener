@@ -1,60 +1,113 @@
 {% extends 'base.html' %}
 
-{% block page_title %}Create Job Opening{% endblock %}
+{% block page_title %}{% if is_edit %}Edit Job Opening{% else %}Create Job Opening{% endif %}{% endblock %}
 
 {% block content %}
 <div style="margin-bottom: 1.5rem;">
   <a href="{% url 'job_list' %}" style="color: var(--primary); font-size: 0.85rem; text-decoration: none; font-weight: 600;">← Back to Jobs</a>
-  <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-top: 0.5rem;">Create New Job Opening</h1>
+  <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-top: 0.5rem;">
+    {% if is_edit %}Edit Job Opening: {{ job.title }}{% else %}Create New Job Opening{% endif %}
+  </h1>
 </div>
 
-<div class="content-card" style="max-width: 760px;">
+<div class="content-card" style="max-width: 780px;">
+  {% if form.errors %}
+    <div style="padding: 0.85rem 1.25rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; color: #f87171; font-size: 0.9rem; margin-bottom: 1.5rem;">
+      <div style="font-weight: 600; margin-bottom: 0.35rem;">Please correct the following errors:</div>
+      <ul style="margin: 0; padding-left: 1.25rem;">
+        {% for field, errors in form.errors.items %}
+          {% for error in errors %}
+            <li><strong>{{ field|title }}:</strong> {{ error }}</li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
   <form method="POST">
     {% csrf_token %}
     <div class="form-group">
       <label class="form-label">Job Title *</label>
       {{ form.title }}
-      {{ form.title.errors }}
+      {% if form.title.errors %}
+        <div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.25rem;">{{ form.title.errors.0 }}</div>
+      {% endif %}
     </div>
+
     <div class="form-group">
       <label class="form-label">Job Description *</label>
       {{ form.description }}
-      {{ form.description.errors }}
+      {% if form.description.errors %}
+        <div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.25rem;">{{ form.description.errors.0 }}</div>
+      {% endif %}
     </div>
+
     <div class="form-group">
-      <label class="form-label">Required Skills (Comma separated) *</label>
+      <label class="form-label">Required Skills (Mandatory, comma-separated) *</label>
       {{ form.required_skills_input }}
-      {{ form.required_skills_input.errors }}
+      <small style="color: #94a3b8; font-size: 0.8rem;">Enter required technical skills, e.g. <code>Python, Django, PostgreSQL</code></small>
+      {% if form.required_skills_input.errors %}
+        <div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.25rem;">{{ form.required_skills_input.errors.0 }}</div>
+      {% endif %}
     </div>
+
     <div class="form-group">
-      <label class="form-label">Preferred Skills (Optional, comma separated)</label>
+      <label class="form-label">Preferred Skills (Optional, comma-separated)</label>
       {{ form.preferred_skills_input }}
-      {{ form.preferred_skills_input.errors }}
+      <small style="color: #94a3b8; font-size: 0.8rem;">Nice-to-have bonus skills, e.g. <code>Docker, AWS, Redis, GraphQL</code></small>
+      {% if form.preferred_skills_input.errors %}
+        <div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.25rem;">{{ form.preferred_skills_input.errors.0 }}</div>
+      {% endif %}
     </div>
+
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
       <div class="form-group">
         <label class="form-label">Minimum Experience (Years)</label>
         {{ form.min_experience }}
-        {{ form.min_experience.errors }}
+        <small style="color: #94a3b8; font-size: 0.8rem;">Minimum years required (e.g. <code>0</code> for fresher, <code>2</code> for junior)</small>
+        {% if form.min_experience.errors %}
+          <div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.25rem;">{{ form.min_experience.errors.0 }}</div>
+        {% endif %}
       </div>
       <div class="form-group">
         <label class="form-label">Maximum Experience (Optional)</label>
         {{ form.max_experience }}
-        {{ form.max_experience.errors }}
+        <small style="color: #94a3b8; font-size: 0.8rem;">Upper threshold (e.g. <code>5</code>)</small>
+        {% if form.max_experience.errors %}
+          <div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.25rem;">{{ form.max_experience.errors.0 }}</div>
+        {% endif %}
       </div>
     </div>
+
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
       <div class="form-group">
-        <label class="form-label">Status</label>
+        <label class="form-label">Job Status</label>
         {{ form.status }}
+        {% if form.status.errors %}
+          <div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.25rem;">{{ form.status.errors.0 }}</div>
+        {% endif %}
       </div>
       <div class="form-group">
-        <label class="form-label">Minimum Threshold Score (0-100)</label>
+        <label class="form-label">Minimum Threshold Score (0–100, Optional)</label>
         {{ form.minimum_score }}
+        <small style="color: #94a3b8; font-size: 0.8rem;">Filter candidates scoring below this percentage</small>
+        {% if form.minimum_score.errors %}
+          <div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.25rem;">{{ form.minimum_score.errors.0 }}</div>
+        {% endif %}
       </div>
     </div>
+
+    <div class="form-group">
+      <label class="form-label">Shortlist Target Count (Optional)</label>
+      {{ form.shortlist_count }}
+      <small style="color: #94a3b8; font-size: 0.8rem;">Max target number of candidates to shortlist (e.g. <code>5</code>). Leave blank if unconstrained.</small>
+      {% if form.shortlist_count.errors %}
+        <div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.25rem;">{{ form.shortlist_count.errors.0 }}</div>
+      {% endif %}
+    </div>
+
     <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-      <button type="submit" class="btn btn-primary">Create Job Opening</button>
+      <button type="submit" class="btn btn-primary">{% if is_edit %}Save Changes{% else %}Create Job Opening{% endif %}</button>
       <a href="{% url 'job_list' %}" class="btn btn-secondary" style="text-decoration: none;">Cancel</a>
     </div>
   </form>
