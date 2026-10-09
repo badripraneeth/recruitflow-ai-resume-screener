@@ -1,6 +1,7 @@
 """
 LLM Service integration layer.
-Interacts with the LLM API using environment variables (LLM_API_KEY or GEMINI_API_KEY).
+Uses the google-genai SDK (google.genai) — the modern replacement for
+the deprecated google.generativeai package.
 Handles API errors, timeouts, clean JSON stripping, and fallback mock capabilities for tests.
 """
 
@@ -57,9 +58,7 @@ def clean_json_response(raw_text):
 
     # Remove markdown code blocks if present
     if text.startswith('```'):
-        # Remove opening ``` or ```json
         text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
-        # Remove closing ```
         text = re.sub(r'\s*```$', '', text)
 
     return text.strip()
@@ -67,12 +66,23 @@ def clean_json_response(raw_text):
 
 class LLMService:
     """
-    Unified LLM service interfacing with Gemini or OpenAI-compatible providers.
+    Unified LLM service using the google-genai SDK (google.genai).
     Enforces structured JSON output and strict error handling.
+    Falls back through multiple models on 404/503 errors.
     """
+    # Models in priority order — all confirmed available via google.genai
+    GEMINI_FALLBACK_MODELS = [
+        'gemini-3.5-flash',
+        'gemini-3.6-flash',
+        'gemini-3.7-flash',
+        'gemini-3.8-flash',
+        'gemini-flash-latest',
+        'gemini-flash-lite-latest',
+    ]
+
     def __init__(self, api_key=None, model_name=None):
         self.api_key = api_key or get_llm_api_key()
-        self.model_name = model_name or os.getenv('LLM_MODEL', 'gemini-2.0-flash')
+        self.model_name = model_name or os.getenv('LLM_MODEL', 'gemini-3.5-flash')
         self.mock_mode = os.getenv('MOCK_LLM', 'False').lower() in ('true', '1', 'yes')
 
     def generate_json(self, system_prompt, user_prompt, timeout=60):
@@ -81,19 +91,16 @@ class LLMService:
         Handles timeouts, API errors, and JSON decode failures.
         """
         if self.mock_mode or not self.api_key:
-            # If no API key configured and in testing/local mode, provide a structured mock
             if not self.api_key and not self.mock_mode:
                 raise LLMConfigurationError(
                     "LLM_API_KEY is not configured in .env. Please configure LLM_API_KEY or GEMINI_API_KEY."
                 )
             return self._generate_mock_response(user_prompt)
 
-        # Attempt Gemini API first if google-generativeai is available
         try:
             return self._call_gemini(system_prompt, user_prompt, timeout=timeout)
         except Exception as gemini_err:
-            # If Gemini fails or key is OpenAI, attempt OpenAI
-            if 'openai' in str(gemini_err).lower() or os.getenv('OPENAI_API_KEY'):
+            if os.getenv('OPENAI_API_KEY'):
                 try:
                     return self._call_openai(system_prompt, user_prompt, timeout=timeout)
                 except Exception as openai_err:
@@ -101,54 +108,66 @@ class LLMService:
             raise LLMAPIError(f"Gemini API request failed: {str(gemini_err)}") from gemini_err
 
     def _call_gemini(self, system_prompt, user_prompt, timeout=60):
-        import google.generativeai as genai
-        from google.api_core.exceptions import GoogleAPICallError, DeadlineExceeded, NotFound
+        """
+        Calls Gemini using the new google.genai SDK.
+        Tries self.model_name first, then falls back through GEMINI_FALLBACK_MODELS.
+        """
+        from google import genai
+        from google.genai import types
+        from google.genai.errors import APIError, ClientError, ServerError
 
-        genai.configure(api_key=self.api_key)
-        
-        generation_config = {
-            "response_mime_type": "application/json",
-            "temperature": 0.1,
-        }
+        client = genai.Client(api_key=self.api_key)
 
+        # Build candidate model list (primary first, then fallbacks without duplicates)
         candidate_models = [self.model_name]
-        for fallback in ('gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-1.5-pro'):
-            if fallback not in candidate_models:
-                candidate_models.append(fallback)
+        for fb in self.GEMINI_FALLBACK_MODELS:
+            if fb not in candidate_models:
+                candidate_models.append(fb)
+
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            temperature=0.1,
+            system_instruction=system_prompt,
+        )
 
         last_err = None
-        for m_name in candidate_models:
+        for model in candidate_models:
             try:
-                model = genai.GenerativeModel(
-                    model_name=m_name,
-                    system_instruction=system_prompt,
-                    generation_config=generation_config
+                response = client.models.generate_content(
+                    model=model,
+                    contents=user_prompt,
+                    config=config,
                 )
-
-                response = model.generate_content(
-                    user_prompt,
-                    request_options={"timeout": timeout}
-                )
-
                 raw_text = response.text if hasattr(response, 'text') else str(response)
                 cleaned = clean_json_response(raw_text)
-
                 try:
                     return json.loads(cleaned)
                 except json.JSONDecodeError as decode_err:
-                    raise LLMJSONDecodeError(f"LLM did not return valid JSON: {str(decode_err)}\nRaw text: {raw_text[:300]}")
+                    raise LLMJSONDecodeError(
+                        f"LLM did not return valid JSON: {str(decode_err)}\nRaw text: {raw_text[:300]}"
+                    )
 
-            except NotFound as not_found_err:
-                last_err = not_found_err
-                continue
-            except DeadlineExceeded as timeout_err:
-                last_err = timeout_err
-                continue
-            except GoogleAPICallError as api_err:
-                last_err = api_err
+            except ClientError as ce:
+                # 404 = model not found, 429 = rate limited — skip to next
+                last_err = ce
+                status = getattr(ce, 'status_code', 0) or 0
+                if status in (404, 429):
+                    continue
+                raise LLMAPIError(f"Gemini client error ({status}): {str(ce)}") from ce
+
+            except ServerError as se:
+                # 503 = overloaded — try next model
+                last_err = se
                 continue
 
-        raise LLMAPIError(f"Gemini API call failed across models: {str(last_err)}")
+            except Exception as e:
+                last_err = e
+                err_msg = str(e).lower()
+                if any(x in err_msg for x in ('not found', '404', 'unavailable', '503', 'quota', '429')):
+                    continue
+                raise LLMAPIError(f"Unexpected Gemini error: {str(e)}") from e
+
+        raise LLMAPIError(f"All Gemini models failed. Last error: {str(last_err)}")
 
     def _call_openai(self, system_prompt, user_prompt, timeout=60):
         from openai import OpenAI, APITimeoutError, APIError
