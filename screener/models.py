@@ -139,8 +139,7 @@ class ScreeningResult(models.Model):
         default=0.0,
         help_text="Extracted total years of experience"
     )
-    candidate_education = models.CharField(
-        max_length=255,
+    candidate_education = models.TextField(
         blank=True,
         help_text="Extracted education credentials summary string"
     )

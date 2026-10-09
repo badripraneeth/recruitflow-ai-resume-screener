@@ -328,17 +328,33 @@ def analyze_resume_against_job(resume, job=None, llm_service=None):
         analysis['skills'] = fallback_analysis['skills']
 
     # Update Resume with extracted candidate metadata
-    extracted_name = (analysis.get('candidate_name') or '').strip()
-    extracted_email = (analysis.get('candidate_email') or '').strip()
+    extracted_name = (analysis.get('candidate_name') or '').strip()[:255]
+    extracted_email = (analysis.get('candidate_email') or '').strip()[:255]
     resume.candidate_name = extracted_name if extracted_name.lower() not in ('unknown', 'none', 'n/a') else ''
     resume.candidate_email = extracted_email if extracted_email.lower() not in ('unknown', 'none', 'n/a') else ''
     resume.save(update_fields=['candidate_name', 'candidate_email', 'updated_at'])
 
     # Education summary string for display
-    edu_str = ", ".join([f"{e['degree']} in {e['field']}".strip() for e in analysis['education'] if e['degree']])
+    edu_items = []
+    for e in analysis['education']:
+        deg = (e.get('degree') or '').strip()
+        field = (e.get('field') or '').strip()
+        if deg and field:
+            edu_items.append(f"{deg} in {field}")
+        elif deg:
+            edu_items.append(deg)
+    edu_str = ", ".join(edu_items)
 
     # Projects summary string for display
-    proj_str = "; ".join([f"{p['name']}: {p['description']}".strip() for p in analysis['projects'] if p['name']])
+    proj_items = []
+    for p in analysis['projects']:
+        p_name = (p.get('name') or '').strip()
+        p_desc = (p.get('description') or '').strip()
+        if p_name and p_desc:
+            proj_items.append(f"{p_name}: {p_desc}")
+        elif p_name:
+            proj_items.append(p_name)
+    proj_str = "; ".join(proj_items)
 
     # Create or update ScreeningResult (Scores remain untouched / 0.0)
     screening_result, created = ScreeningResult.objects.update_or_create(
